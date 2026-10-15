@@ -1,0 +1,26 @@
+version = 0.1
+
+[default]
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.validate.parameters]
+lint = false
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false
+resolve_s3 = true
+stack_name = "BroccoliZaraVoiceAgentSAM"
+s3_prefix = "BroccoliZaraVoiceAgentSAM"
+region = "us-east-1"
+parameter_overrides = [
+  "Stage=\"prod\"",
+  "AllowedOrigins=\"*\"",
+  "BedrockSonicModelId=\"amazon.nova-2-sonic-v1:0\"",
+  "BedrockModelId=\"amazon.nova-lite-v1:0\"",
+  "N8nWebhookUrl=\"https://n8n.smbjugaad.com/webhook/broccoli-full-lookup\"",
+  "JwtSecret=\"broccoli-zara-secret-key-2026\""
+]
+image_repositories = []

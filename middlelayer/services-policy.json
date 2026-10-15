@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BedrockAccess",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithBidirectionalStream",
+        "bedrock:Converse"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ApiGatewayManageConnections",
+      "Effect": "Allow",
+      "Action": [
+        "execute-api:ManageConnections"
+      ],
+      "Resource": "arn:aws:execute-api:*:*:*/*"
+    }
+  ]
+}

@@ -1,0 +1,145 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Broccoli Pizza & Pasta - Zara Voice Assistant Lambda and WebSocket API Gateway Backend using Amazon Bedrock Nova 2 Sonic and n8n Webhook'
+
+Parameters:
+  S3Bucket:
+    Type: String
+    Default: 'cdk-hnb659fds-assets-529349714437-us-east-1'
+  S3Key:
+    Type: String
+    Default: 'middlelayer.zip'
+
+Resources:
+  ZaraLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: BroccoliZaraLambdaExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BroccoliZaraServicesPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: BedrockAccess
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithBidirectionalStream
+                  - bedrock:Converse
+                Resource: '*'
+              - Sid: ApiGatewayManageConnections
+                Effect: Allow
+                Action:
+                  - execute-api:ManageConnections
+                Resource: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*/*'
+
+  ZaraFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: BroccoliZaraVoiceAssistant
+      Handler: index.handler
+      Runtime: nodejs20.x
+      Role: !GetAtt ZaraLambdaRole.Arn
+      MemorySize: 512
+      Timeout: 60
+      Code:
+        S3Bucket: !Ref S3Bucket
+        S3Key: !Ref S3Key
+      Environment:
+        Variables:
+          BEDROCK_SONIC_MODEL_ID: 'amazon.nova-2-sonic-v1:0'
+          BEDROCK_MODEL_ID: 'amazon.nova-lite-v1:0'
+          ALLOWED_ORIGINS: 'http://localhost:5173,http://localhost:3000,*.hostinger.com,https://broccoli.ae,http://broccoli.ae'
+          DEV_BYPASS: 'true'
+          JWT_SECRET: 'broccoli-zara-secret-key-2026'
+          N8N_WEBHOOK_URL: 'https://n8n.smbjugaad.com/webhook/broccoli-full-lookup'
+          N8N_WEBHOOK_KEY: ''
+
+  ZaraFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !Ref ZaraFunction
+      AuthType: NONE
+      Cors:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - '*'
+        AllowHeaders:
+          - '*'
+
+  ZaraFunctionUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ZaraFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
+  ZaraWebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: BroccoliZaraWebSocketAPI
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: '$request.body.action'
+
+  ZaraApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ZaraWebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ZaraFunction.Arn}/invocations'
+
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ZaraWebSocketApi
+      RouteKey: '$connect'
+      Target: !Sub 'integrations/${ZaraApiIntegration}'
+
+  DefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ZaraWebSocketApi
+      RouteKey: '$default'
+      Target: !Sub 'integrations/${ZaraApiIntegration}'
+
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ZaraWebSocketApi
+      RouteKey: '$disconnect'
+      Target: !Sub 'integrations/${ZaraApiIntegration}'
+
+  ApiGatewayLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ZaraFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ZaraWebSocketApi}/*'
+
+  ZaraStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref ZaraWebSocketApi
+      StageName: 'prod'
+      AutoDeploy: true
+
+Outputs:
+  WebSocketUrl:
+    Description: 'WebSocket URL for React Voice Assistant'
+    Value: !Sub 'wss://${ZaraWebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
+  FunctionUrl:
+    Description: 'Direct HTTP Test URL'
+    Value: !GetAtt ZaraFunctionUrl.FunctionUrl
+
