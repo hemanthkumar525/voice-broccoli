@@ -1,0 +1,15 @@
+{
+  "name": "Broccoli Pizza & Pasta",
+  "short_name": "Broccoli",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f6f0",
+  "theme_color": "#1d3928",
+  "icons": [
+    {
+      "src": "/broccoli-logo.webp",
+      "sizes": "360x108",
+      "type": "image/webp"
+    }
+  ]
+}
